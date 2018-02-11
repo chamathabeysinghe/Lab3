@@ -12,12 +12,50 @@ public class Main {
         boardedSemaphore = new Semaphore(0);
         mutex = new ReentrantLock();
 
-        for(int i = 0;i<100;i++){
-            new Passenger(i).start();
-        }
-        new Bus(99).run();
-        new Bus(100).run();
-        new Bus(101).run();
+//        for(int i = 0;i<100;i++){
+//            new Passenger(i).start();
+//        }
+//        new Bus(99).run();
+//        new Bus(100).run();
+//        new Bus(101).run();
+
+        Thread passengerDaemon = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int count = 0;
+                while(true){
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    new Passenger(count).start();
+                    count+=1;
+
+                }
+            }
+        });
+
+        Thread busDaemon = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int count = 0;
+                while(true){
+                    try {
+                        Thread.sleep(40000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    new Bus(count).start();
+                    count+=1;
+
+                }
+            }
+        });
+
+        passengerDaemon.start();
+        busDaemon.start();
+
 
     }
 
@@ -115,3 +153,5 @@ class Passenger extends Thread {
 
     }
 }
+
+
