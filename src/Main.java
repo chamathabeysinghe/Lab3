@@ -1,4 +1,15 @@
+import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.Semaphore;
+
+
+/**
+ * Solution to Senate Bus Problem
+ *
+ * Assumptions
+ *   * 50 passengers are able to board a bus
+ *     before the next bus arrives (20 seconds).
+ */
 
 public class Main {
 
@@ -12,42 +23,44 @@ public class Main {
         boardedSemaphore = new Semaphore(0);
         mutex = new ReentrantLock();
 
-//        for(int i = 0;i<100;i++){
-//            new Passenger(i).start();
-//        }
-//        new Bus(99).run();
-//        new Bus(100).run();
-//        new Bus(101).run();
-
+        /**
+         * Add passengers to the queue
+         * at the bus stop
+         */
         Thread passengerDaemon = new Thread(new Runnable() {
             @Override
             public void run() {
                 int count = 0;
+                Random randomGenerator = new Random();
                 while(true){
                     try {
-                        Thread.sleep(1000);
+                        int sleepTime = randomGenerator.nextInt(800); // passengers arrive randomly.
+                        Thread.sleep(sleepTime);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                     new Passenger(count).start();
-                    count+=1;
+                    count += 1;
 
                 }
             }
         });
 
+        /**
+         * Bring buses to bus stop.
+         */
         Thread busDaemon = new Thread(new Runnable() {
             @Override
             public void run() {
                 int count = 0;
                 while(true){
                     try {
-                        Thread.sleep(40000);
+                        Thread.sleep(20000); // buses come every 20 seconds.
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                     new Bus(count).start();
-                    count+=1;
+                    count += 1;
 
                 }
             }
@@ -61,32 +74,6 @@ public class Main {
 
 }
 
-class Semaphore {
-
-    int val;
-
-    Semaphore(int val) {
-        this.val = val;
-    }
-
-    public synchronized void up() {
-        val++;
-        this.notify();
-    }
-
-    public synchronized void down() {
-        val--;
-        if (val < 0) {
-            try {
-                this.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-    }
-
-}
 
 class Bus extends Thread {
 
@@ -99,29 +86,38 @@ class Bus extends Thread {
     }
 
     private void busArrived() {
-        System.out.println("Bus: " + busId + " arrived");
+        System.out.println("Bus: " + busId + " arrived.");
     }
 
     private void busDeparted() {
-        System.out.println("Bus: " + busId + " departed");
+        System.out.println("Bus: " + busId + " departed.");
     }
 
     public void run() {
 
-        Main.mutex.lock();
         Bus.currentBus = this;
         busArrived();
 
+        /* stop new passengers from entering queue
+         while existing passengers are boarding. */
+        Main.mutex.lock();
 
+        /* to either take all waiting, or up to 50 passengers */
         int n = Math.min(Passenger.waiting, 50);
 
         for (int i = 0; i < n; i++) {
-            Main.busSemaphore.up();
-            Main.boardedSemaphore.down();
+            Main.busSemaphore.release(); // allow passenger in.
+            try {
+                Main.boardedSemaphore.acquire(); // wait until passengers board
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
+
         Passenger.waiting = Math.max(Passenger.waiting - 50, 0);
+        Main.mutex.unlock(); // allow new passengers into a new queue
+
         busDeparted();
-        Main.mutex.unlock();
 
     }
 
@@ -139,17 +135,23 @@ class Passenger extends Thread {
 
 
     private void board() {
-        System.out.println("Passenger: " + passengerId + " boarded to bus: " + Bus.currentBus.busId);
+        System.out.println("Passenger: " + passengerId + " boarded to bus: " + Bus.currentBus.busId + ".");
     }
 
     public void run() {
+        /* before entering the waiting queue */
         Main.mutex.lock();
         Passenger.waiting += 1;
         Main.mutex.unlock();
-        System.out.println("Passenger: "+passengerId+" arrived");
-        Main.busSemaphore.down();
+        System.out.println("Passenger: " + passengerId + " arrived.");
+
+        try {
+            Main.busSemaphore.acquire(); // wait for bus.
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         board();
-        Main.boardedSemaphore.up();
+        Main.boardedSemaphore.release(); // notify bus that passenger boarded.
 
     }
 }
