@@ -5,10 +5,6 @@ import java.util.concurrent.Semaphore;
 
 /**
  * Solution to Senate Bus Problem
- *
- * Assumptions
- *   * 50 passengers are able to board a bus
- *     before the next bus arrives (20 seconds).
  */
 
 public class Main {
@@ -17,6 +13,7 @@ public class Main {
     public static Semaphore busSemaphore;
     public static Semaphore boardedSemaphore;
     public static ReentrantLock mutex;
+    private static Random rand = new Random(); // generates uniformly random numbers
 
     public static void main(String args[]) {
         busSemaphore = new Semaphore(0);
@@ -25,16 +22,16 @@ public class Main {
 
         /**
          * Add passengers to the queue
-         * at the bus stop
+         * at the bus stop.
+         * @See #getRandomNumber for sleep time calculation.
          */
         Thread passengerDaemon = new Thread(new Runnable() {
             @Override
             public void run() {
                 int count = 0;
-                Random randomGenerator = new Random();
                 while(true){
                     try {
-                        int sleepTime = randomGenerator.nextInt(800); // passengers arrive randomly.
+                        int sleepTime = Main.getRandomNumber(5); // means modified to reflect given ratio (40:1)
                         Thread.sleep(sleepTime);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -55,7 +52,7 @@ public class Main {
                 int count = 0;
                 while(true){
                     try {
-                        Thread.sleep(20000); // buses come every 20 seconds.
+                        Thread.sleep(Main.getRandomNumber(200)); // means modified to reflect given ratio (40:1)
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -70,6 +67,19 @@ public class Main {
         busDaemon.start();
 
 
+    }
+
+    /**
+     *  x = log(1-u)/(−λ)
+     *  where u is a uniform random number between 0 and 1,
+     *  λ is the rate parameter,
+     *  and x is the random number with an exponential distribution.
+     *
+     *  Using inverse transform sampling method to get values from exponential distribution,
+     *  modified to use mean directly, which is inverse of rate parameter.
+     *  Multiplied by 100 to get usable millisecond values. */
+    public static int getRandomNumber(int mean){
+        return (int) (Math.log(1- rand.nextDouble()) * 100 * mean * (-1));
     }
 
 }
@@ -95,12 +105,11 @@ class Bus extends Thread {
 
     public void run() {
 
-        Bus.currentBus = this;
-        busArrived();
-
         /* stop new passengers from entering queue
          while existing passengers are boarding. */
         Main.mutex.lock();
+        Bus.currentBus = this;
+        busArrived();
 
         /* to either take all waiting, or up to 50 passengers */
         int n = Math.min(Passenger.waiting, 50);
